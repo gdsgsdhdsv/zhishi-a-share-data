@@ -8,7 +8,9 @@ import json
 import math
 import os
 import re
+import subprocess
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -25,8 +27,50 @@ _BROWSER_HEADERS = {
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     ),
-    "Accept": "application/json,text/plain,*/*",
 }
+
+
+def _curl_get(
+    candidates: list[str],
+    headers: dict[str, str],
+    params: dict[str, Any] | None,
+    timeout: float,
+) -> requests.Response | None:
+    for candidate in candidates:
+        prepared = requests.Request(
+            method="GET",
+            url=candidate,
+            params=params,
+            headers=headers,
+        ).prepare()
+        command = [
+            "curl",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--max-time",
+            str(max(5, int(timeout))),
+            prepared.url,
+        ]
+        for key, item in headers.items():
+            command[1:1] = ["--header", f"{key}: {item}"]
+        try:
+            result = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                timeout=timeout + 5,
+            )
+            response = requests.Response()
+            response.status_code = 200
+            response._content = result.stdout
+            response.url = prepared.url
+            response.encoding = "utf-8"
+            return response
+        except (subprocess.SubprocessError, OSError):
+            continue
+    return None
 
 
 def _resilient_public_request(
@@ -38,8 +82,6 @@ def _resilient_public_request(
     """Use browser-like headers and alternate Eastmoney hosts when one edge drops."""
     headers = dict(_BROWSER_HEADERS)
     headers.update(kwargs.pop("headers", {}) or {})
-    if "eastmoney.com" in url:
-        headers.setdefault("Referer", "https://quote.eastmoney.com/")
     kwargs["headers"] = headers
     candidates = [url]
     if "82.push2.eastmoney.com" in url:
@@ -49,6 +91,14 @@ def _resilient_public_request(
                 url.replace("82.push2.eastmoney.com", "6.push2.eastmoney.com"),
             ]
         )
+        page_number = int((kwargs.get("params") or {}).get("pn", 1))
+        offset = (page_number - 1) % len(candidates)
+        candidates = candidates[offset:] + candidates[:offset]
+    timeout = float(kwargs.get("timeout", 15))
+    if method.upper() == "GET" and "push2.eastmoney.com" in url:
+        curl_response = _curl_get(candidates, headers, kwargs.get("params"), timeout)
+        if curl_response is not None:
+            return curl_response
     last_error: requests.RequestException | None = None
     for candidate in candidates:
         try:
@@ -57,6 +107,10 @@ def _resilient_public_request(
             return response
         except requests.RequestException as error:
             last_error = error
+    if method.upper() == "GET":
+        curl_response = _curl_get(candidates, headers, kwargs.get("params"), timeout)
+        if curl_response is not None:
+            return curl_response
     assert last_error is not None
     raise last_error
 
@@ -140,14 +194,111 @@ def is_trading_day(today: datetime) -> bool:
     return today.strftime("%Y%m%d") in dates
 
 
+ALL_STOCKS = "m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:7+f:!2,m:1+t:3+f:!2"
+QUOTE_STOCKS = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048"
+
+
+def eastmoney_frame(
+    *,
+    fields: dict[str, str],
+    sort_field: str,
+    stock_filter: str,
+    extra: dict[str, str] | None = None,
+) -> pd.DataFrame:
+    """Fetch only the fields used by the dashboard to avoid oversized edge requests."""
+    url = "https://82.push2.eastmoney.com/api/qt/clist/get"
+    base = {
+        "po": "1",
+        "np": "1",
+        "fltt": "2",
+        "invt": "2",
+        "fid": sort_field,
+        "fs": stock_filter,
+        "fields": ",".join(fields),
+        "pz": "500",
+    }
+    if extra:
+        base.update(extra)
+    records: list[dict[str, Any]] = []
+    page = 1
+    expected_total: int | None = None
+    while True:
+        params = {**base, "pn": str(page)}
+        response: requests.Response | None = None
+        for attempt in range(4):
+            try:
+                response = requests.get(url, params=params, timeout=20)
+                break
+            except requests.RequestException:
+                if attempt == 3:
+                    raise
+                time.sleep((attempt + 1) * 4)
+        assert response is not None
+        payload = response.json()
+        data = payload.get("data") or {}
+        batch = data.get("diff") or []
+        if expected_total is None:
+            expected_total = int(data.get("total") or 0)
+        records.extend(batch)
+        if not batch or len(records) >= expected_total:
+            break
+        time.sleep(0.8)
+        page += 1
+        if page > 80:
+            raise RuntimeError("公开行情分页异常")
+    if expected_total and len(records) < min(expected_total, 4500):
+        raise RuntimeError(f"公开行情分页不完整: {len(records)}/{expected_total}")
+    frame = pd.DataFrame(records)
+    frame.rename(columns=fields, inplace=True)
+    return frame[[name for name in fields.values() if name in frame.columns]]
+
+
 def load_frames() -> dict[str, pd.DataFrame]:
     return {
-        "quotes": clean_columns(ak.stock_zh_a_spot_em()),
-        "main": clean_columns(ak.stock_main_fund_flow(symbol="全部股票")),
-        "flow_today": clean_columns(ak.stock_individual_fund_flow_rank(indicator="今日")),
-        "flow_5": clean_columns(ak.stock_individual_fund_flow_rank(indicator="5日")),
-        "sector_today": clean_columns(ak.stock_sector_fund_flow_rank(indicator="今日", sector_type="行业资金流")),
-        "sector_5": clean_columns(ak.stock_sector_fund_flow_rank(indicator="5日", sector_type="行业资金流")),
+        "quotes": eastmoney_frame(
+            fields={
+                "f12": "代码", "f14": "名称", "f2": "最新价", "f3": "涨跌幅",
+                "f6": "成交额", "f8": "换手率", "f9": "市盈率-动态",
+                "f10": "量比", "f20": "总市值", "f23": "市净率", "f24": "60日涨跌幅",
+            },
+            sort_field="f12",
+            stock_filter=QUOTE_STOCKS,
+        ),
+        "main": eastmoney_frame(
+            fields={
+                "f12": "代码", "f14": "名称", "f184": "今日排行榜-主力净占比",
+                "f165": "5日排行榜-主力净占比", "f109": "5日排行榜-5日涨跌",
+                "f100": "所属板块",
+            },
+            sort_field="f184",
+            stock_filter=ALL_STOCKS,
+        ),
+        "flow_today": eastmoney_frame(
+            fields={
+                "f12": "代码", "f14": "名称", "f62": "今日主力净流入-净额",
+                "f184": "今日主力净流入-净占比",
+            },
+            sort_field="f62",
+            stock_filter=ALL_STOCKS,
+        ),
+        "flow_5": eastmoney_frame(
+            fields={
+                "f12": "代码", "f14": "名称", "f164": "5日主力净流入-净额",
+                "f165": "5日主力净流入-净占比",
+            },
+            sort_field="f164",
+            stock_filter=ALL_STOCKS,
+        ),
+        "sector_today": eastmoney_frame(
+            fields={"f14": "名称", "f3": "今日涨跌幅", "f62": "今日主力净流入-净额"},
+            sort_field="f62",
+            stock_filter="m:90+t:2",
+        ),
+        "sector_5": eastmoney_frame(
+            fields={"f14": "名称", "f109": "5日涨跌幅", "f164": "5日主力净流入-净额"},
+            sort_field="f164",
+            stock_filter="m:90+t:2",
+        ),
     }
 
 
