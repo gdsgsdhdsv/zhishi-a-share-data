@@ -16,6 +16,50 @@ from zoneinfo import ZoneInfo
 
 import akshare as ak
 import pandas as pd
+import requests
+
+
+_ORIGINAL_REQUEST = requests.sessions.Session.request
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json,text/plain,*/*",
+}
+
+
+def _resilient_public_request(
+    session: requests.Session,
+    method: str,
+    url: str,
+    **kwargs: Any,
+) -> requests.Response:
+    """Use browser-like headers and alternate Eastmoney hosts when one edge drops."""
+    headers = dict(_BROWSER_HEADERS)
+    headers.update(kwargs.pop("headers", {}) or {})
+    if "eastmoney.com" in url:
+        headers.setdefault("Referer", "https://quote.eastmoney.com/")
+    kwargs["headers"] = headers
+    candidates = [url]
+    if "82.push2.eastmoney.com" in url:
+        candidates.extend(
+            [
+                url.replace("82.push2.eastmoney.com", "push2.eastmoney.com"),
+                url.replace("82.push2.eastmoney.com", "6.push2.eastmoney.com"),
+            ]
+        )
+    last_error: requests.RequestException | None = None
+    for candidate in candidates:
+        try:
+            return _ORIGINAL_REQUEST(session, method, candidate, **kwargs)
+        except requests.RequestException as error:
+            last_error = error
+    assert last_error is not None
+    raise last_error
+
+
+requests.sessions.Session.request = _resilient_public_request
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 FACTORS = (
