@@ -52,7 +52,9 @@ def _resilient_public_request(
     last_error: requests.RequestException | None = None
     for candidate in candidates:
         try:
-            return _ORIGINAL_REQUEST(session, method, candidate, **kwargs)
+            response = _ORIGINAL_REQUEST(session, method, candidate, **kwargs)
+            response.raise_for_status()
+            return response
         except requests.RequestException as error:
             last_error = error
     assert last_error is not None
