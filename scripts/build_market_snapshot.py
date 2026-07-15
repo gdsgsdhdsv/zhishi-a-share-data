@@ -194,8 +194,7 @@ def is_trading_day(today: datetime) -> bool:
     return today.strftime("%Y%m%d") in dates
 
 
-ALL_STOCKS = "m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:7+f:!2,m:1+t:3+f:!2"
-QUOTE_STOCKS = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048"
+ALL_STOCKS = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23"
 
 
 def eastmoney_frame(
@@ -204,6 +203,7 @@ def eastmoney_frame(
     sort_field: str,
     stock_filter: str,
     extra: dict[str, str] | None = None,
+    limit: int | None = None,
 ) -> pd.DataFrame:
     """Fetch only the fields used by the dashboard to avoid oversized edge requests."""
     url = "https://82.push2.eastmoney.com/api/qt/clist/get"
@@ -215,7 +215,7 @@ def eastmoney_frame(
         "fid": sort_field,
         "fs": stock_filter,
         "fields": ",".join(fields),
-        "pz": "500",
+        "pz": str(min(limit or 500, 500)),
     }
     if extra:
         base.update(extra)
@@ -240,30 +240,24 @@ def eastmoney_frame(
         if expected_total is None:
             expected_total = int(data.get("total") or 0)
         records.extend(batch)
-        if not batch or len(records) >= expected_total:
+        if not batch or len(records) >= expected_total or (limit is not None and len(records) >= limit):
             break
         time.sleep(0.8)
         page += 1
         if page > 80:
             raise RuntimeError("公开行情分页异常")
-    if expected_total and len(records) < min(expected_total, 4500):
+    if limit is None and expected_total and len(records) < min(expected_total, 4500):
         raise RuntimeError(f"公开行情分页不完整: {len(records)}/{expected_total}")
-    frame = pd.DataFrame(records)
+    frame = pd.DataFrame(records[:limit] if limit is not None else records)
     frame.rename(columns=fields, inplace=True)
     return frame[[name for name in fields.values() if name in frame.columns]]
 
 
 def load_frames() -> dict[str, pd.DataFrame]:
+    quotes = clean_columns(ak.stock_zh_a_spot())
+    quotes["代码"] = quotes["代码"].astype(str).str.extract(r"(\d{6})", expand=False)
     return {
-        "quotes": eastmoney_frame(
-            fields={
-                "f12": "代码", "f14": "名称", "f2": "最新价", "f3": "涨跌幅",
-                "f6": "成交额", "f8": "换手率", "f9": "市盈率-动态",
-                "f10": "量比", "f20": "总市值", "f23": "市净率", "f24": "60日涨跌幅",
-            },
-            sort_field="f12",
-            stock_filter=QUOTE_STOCKS,
-        ),
+        "quotes": quotes,
         "main": eastmoney_frame(
             fields={
                 "f12": "代码", "f14": "名称", "f184": "今日排行榜-主力净占比",
@@ -272,6 +266,7 @@ def load_frames() -> dict[str, pd.DataFrame]:
             },
             sort_field="f184",
             stock_filter=ALL_STOCKS,
+            limit=500,
         ),
         "flow_today": eastmoney_frame(
             fields={
@@ -280,6 +275,7 @@ def load_frames() -> dict[str, pd.DataFrame]:
             },
             sort_field="f62",
             stock_filter=ALL_STOCKS,
+            limit=500,
         ),
         "flow_5": eastmoney_frame(
             fields={
@@ -288,16 +284,19 @@ def load_frames() -> dict[str, pd.DataFrame]:
             },
             sort_field="f164",
             stock_filter=ALL_STOCKS,
+            limit=500,
         ),
         "sector_today": eastmoney_frame(
             fields={"f14": "名称", "f3": "今日涨跌幅", "f62": "今日主力净流入-净额"},
             sort_field="f62",
             stock_filter="m:90+t:2",
+            limit=100,
         ),
         "sector_5": eastmoney_frame(
             fields={"f14": "名称", "f109": "5日涨跌幅", "f164": "5日主力净流入-净额"},
             sort_field="f164",
             stock_filter="m:90+t:2",
+            limit=100,
         ),
     }
 
@@ -483,14 +482,14 @@ def score_stocks(frames: dict[str, pd.DataFrame], sector_lookup: dict[str, dict[
 def build_snapshot(snapshot_type: str, now: datetime, frames: dict[str, pd.DataFrame]) -> dict[str, Any]:
     validate_quotes(frames["quotes"], snapshot_type)
     warnings: list[str] = []
-    if len(frames["main"]) < 4000:
-        warnings.append("所属行业或主力资金排名覆盖不完整")
-    if len(frames["flow_today"]) < 4000 or len(frames["flow_5"]) < 4000:
-        warnings.append("部分个股资金净额缺失")
+    if len(frames["main"]) < 300:
+        warnings.append("资金活跃池或行业字段覆盖不足")
+    else:
+        warnings.append("个股资金与行业字段覆盖资金活跃度前 500 只")
+    if len(frames["flow_today"]) < 300 or len(frames["flow_5"]) < 300:
+        warnings.append("个股资金净额覆盖不足")
     if len(frames["sector_today"]) < 60 or len(frames["sector_5"]) < 60:
         warnings.append("行业资金覆盖不完整")
-    if snapshot_type == "close" and warnings:
-        raise RuntimeError("；".join(warnings))
     sectors, sector_lookup = build_sectors(frames["sector_today"], frames["sector_5"])
     stocks = score_stocks(frames, sector_lookup)
     if len(stocks) < 20:
@@ -517,9 +516,9 @@ def build_snapshot(snapshot_type: str, now: datetime, frames: dict[str, pd.DataF
     coverage = {
         "quotes": True,
         "valuation": "市盈率-动态" in frames["quotes"].columns,
-        "stockFlow": len(frames["flow_today"]) >= 4000,
+        "stockFlow": len(frames["flow_today"]) >= 300,
         "sectorFlow": len(frames["sector_today"]) >= 60,
-        "industry": len(frames["main"]) >= 4000,
+        "industry": len(frames["main"]) >= 300,
     }
     status = "partial" if warnings else "live"
     return {
