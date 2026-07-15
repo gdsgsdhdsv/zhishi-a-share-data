@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f3efe7">
+  <meta name="description" content="知势 A 股研究台：正式行情复盘、资金方向、系统选股评分与个股研究。">
+  <title>知势｜A 股研究台</title>
+  <style>
+    :root {
+      --paper:#f3efe7; --card:#fbf8f2; --ink:#20251f; --muted:#73756f;
+      --line:#d9d1c5; --red:#b95b50; --green:#3e7568; --deep:#15231d;
+      --gold:#a8783f; --shadow:0 16px 50px rgba(38,34,27,.08);
+    }
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.55}
+    button,input,textarea{font:inherit}button{cursor:pointer}.shell{min-height:100vh}.sidebar{position:fixed;inset:0 auto 0 0;width:250px;padding:28px 22px;background:#eee8de;border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:20}
+    .brand{display:flex;align-items:center;gap:12px;padding:0 7px 28px}.brand-mark{width:42px;height:42px;border-radius:11px;background:var(--red);color:white;display:grid;place-items:center;font:700 24px Georgia,serif;box-shadow:0 7px 16px rgba(185,91,80,.2)}
+    .brand strong{display:block;font:700 20px Georgia,"Songti SC",serif}.brand span{font-size:11px;letter-spacing:.16em;color:var(--muted)}
+    .nav-label,.eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}.nav-label{padding:0 10px}.nav{display:grid;gap:5px}.nav button{border:0;background:transparent;color:#555b55;padding:11px 12px;border-radius:10px;text-align:left;display:flex;gap:12px;align-items:center}.nav button:hover,.nav button.active{background:#fff9f0;color:var(--ink);box-shadow:0 5px 18px rgba(50,43,34,.05)}.nav i{font-style:normal;font-size:10px;color:#a7a39a}
+    .side-card{margin-top:auto;padding:17px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.35)}.side-card strong{display:block;margin:5px 0;font-family:Georgia,"Songti SC",serif}.side-card p{margin:0;font-size:11px;color:var(--muted)}
+    .side-status{margin-top:14px;padding:12px;font-size:11px;color:var(--muted)}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#b1aaa0;margin-right:8px}.dot.ok{background:var(--green);box-shadow:0 0 0 5px rgba(62,117,104,.1)}.dot.error{background:var(--red)}
+    .workspace{margin-left:250px;padding:30px clamp(20px,4vw,62px) 60px;max-width:1540px}.topbar{display:flex;justify-content:space-between;gap:30px;align-items:flex-end;margin-bottom:26px}.topbar h1{font:500 clamp(28px,3vw,46px)/1.18 Georgia,"Songti SC",serif;margin:8px 0 0;max-width:780px}.search{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);padding:11px 14px;border-radius:12px;min-width:280px;box-shadow:var(--shadow)}.search input{border:0;outline:0;background:transparent;width:100%;color:var(--ink)}
+    .banner{display:flex;justify-content:space-between;gap:24px;align-items:center;border:1px solid #d8b7af;background:#f7eae6;padding:17px 20px;border-radius:15px;margin-bottom:18px}.banner strong{font-family:Georgia,"Songti SC",serif}.banner p{margin:0;color:#775950;font-size:12px;max-width:650px}.banner.ok{border-color:#b9cec4;background:#eaf1ed}.banner.ok p{color:#49665b}
+    .grid{display:grid;gap:18px}.hero{grid-template-columns:minmax(0,1.55fr) minmax(280px,.7fr)}.dark{background:var(--deep);color:#f5f1e9;border-radius:20px;padding:clamp(24px,3vw,38px);box-shadow:var(--shadow)}.paper{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:var(--shadow)}
+    .brief-head{display:flex;justify-content:space-between;gap:25px}.brief-head h2{font:500 clamp(24px,2.4vw,37px)/1.35 Georgia,"Songti SC",serif;margin:10px 0 0;max-width:760px}.pill{border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:8px 12px;height:max-content;font-size:11px;white-space:nowrap}.light{color:#aebbb4}
+    .distribution{height:160px;display:flex;align-items:flex-end;gap:clamp(8px,3vw,36px);padding:28px 10px 16px;border-bottom:1px solid rgba(255,255,255,.13)}.bar{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:7px;font-size:10px;color:#b7c0bb}.bar i{display:block;width:min(44px,70%);border-radius:5px 5px 1px 1px;min-height:7px}.bar i.up{background:#b6695e}.bar i.down{background:#5e9284}.bar small{font-size:9px;color:#8d9992}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding-top:20px}.stat span{display:block;font-size:10px;color:#94a098}.stat strong{font:600 22px Georgia,serif;margin-right:5px}.stat small{color:#87938c}.up{color:var(--red)!important}.down{color:var(--green)!important}
+    .checklist h3,.section-title h2{font:600 25px Georgia,"Songti SC",serif;margin:6px 0 16px}.checks{display:grid;gap:2px}.check{padding:13px 0;border-bottom:1px solid var(--line);display:flex;gap:12px}.check b{width:20px;height:20px;border:1px solid var(--line);border-radius:5px;display:grid;place-items:center;color:white}.check.done b{background:var(--deep)}.check strong{font-size:13px}.check small{display:block;color:var(--muted);font-size:10px}.lesson{margin-top:18px;border-left:3px solid var(--gold);background:#eee7dd;padding:15px}.lesson strong{display:block;font-family:Georgia,"Songti SC",serif}.lesson p{font-size:11px;color:var(--muted);margin:5px 0 0}
+    section{scroll-margin-top:20px}.block{margin-top:34px}.section-title{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:14px}.section-title h2{margin-bottom:0}.chip{font-size:10px;border:1px solid var(--line);border-radius:99px;padding:7px 11px;color:var(--muted)}
+    .flow-wrap{grid-template-columns:minmax(0,1.6fr) minmax(260px,.55fr)}.flow-head,.flow-row{display:grid;grid-template-columns:1.15fr .75fr .75fr .7fr 1fr;gap:8px;align-items:center}.flow-head{font-size:9px;color:var(--muted);padding:0 12px 10px}.flow-row{position:relative;padding:14px 12px;border-top:1px solid var(--line);font-size:12px;overflow:hidden}.flow-row strong{font-size:13px}.flow-row small{display:block;color:var(--muted)}.rank{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:7px;background:#eee7dd;margin-right:8px;font-size:10px}.signal{display:inline-block;padding:4px 8px;border-radius:99px;background:#ece6dc;font-size:10px}.signal.hot{background:#f2ded9;color:#8e473e}.flow-bar{position:absolute;left:0;bottom:0;height:2px;background:var(--red)}
+    .method h3{font:500 24px Georgia,"Songti SC",serif}.method p,.method small{color:#afbbb5;font-size:11px}.method dl{margin:20px 0}.method dl div{display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.12);padding:11px 0}.method dt{font-size:10px;color:#9ba8a1}.method dd{margin:0;font-size:12px}
+    .toolbar{display:flex;gap:7px;flex-wrap:wrap}.toolbar button{border:1px solid var(--line);background:transparent;padding:7px 10px;border-radius:99px;font-size:10px;color:var(--muted)}.toolbar button.active{background:var(--deep);color:white;border-color:var(--deep)}
+    .stock-table{padding:0;overflow:hidden}.stock-head,.stock-row{display:grid;grid-template-columns:1.45fr .8fr .6fr .6fr .8fr .75fr 1fr;gap:8px;align-items:center}.stock-head{padding:13px 18px;background:#eee8de;color:var(--muted);font-size:9px}.stock-row{width:100%;border:0;border-top:1px solid var(--line);background:transparent;text-align:left;padding:15px 18px;color:var(--ink)}.stock-row:hover,.stock-row.selected{background:#f5eee4}.stock-name{display:flex;gap:10px;align-items:center}.stock-name i{font-style:normal;color:#aaa49a;font-size:10px}.stock-name strong{display:block}.stock-name small{display:block;color:var(--muted);font-size:9px}.score strong{font:700 18px Georgia,serif}.meter{display:block;height:3px;background:#ded7cb;margin-top:5px}.meter b{display:block;height:100%;background:var(--gold)}.verdict{font-size:9px;border:1px solid var(--line);padding:4px 7px;border-radius:99px}
+    .research{grid-template-columns:minmax(0,1.15fr) minmax(320px,.65fr)}.quote-line{display:flex;align-items:center;gap:14px;margin-bottom:20px}.quote-line h2{font:600 30px Georgia,"Songti SC",serif;margin:0}.quote-line h2 small{font:400 11px sans-serif;color:var(--muted)}.quote{margin-left:auto;font:600 23px Georgia,serif}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric{padding:13px;background:#f1ebe1;border-radius:11px}.metric span{display:block;color:var(--muted);font-size:9px}.metric strong{font:600 18px Georgia,serif}.factor-list{display:grid;gap:9px;margin-top:15px}.factor{display:grid;grid-template-columns:80px 1fr 28px;gap:9px;align-items:center;font-size:10px}.factor-track{height:4px;background:rgba(255,255,255,.14)}.factor-track i{display:block;height:100%;background:#cf9a6d}.factor small{color:#9aa69f}.note{margin-top:18px}.note textarea{width:100%;min-height:115px;resize:vertical;background:#eee8de;border:1px solid var(--line);border-radius:12px;padding:12px;outline:none;color:var(--ink)}.note button{margin-top:8px;border:0;background:var(--deep);color:white;padding:9px 14px;border-radius:9px;font-size:11px}
+    .coverage{grid-template-columns:repeat(5,1fr)}.coverage article{padding:15px;border:1px solid var(--line);border-radius:13px;background:var(--card)}.coverage span{font-size:9px;color:var(--green)}.coverage span.missing{color:var(--red)}.coverage strong{display:block;margin-top:6px}.coverage small{color:var(--muted);font-size:9px}
+    .empty{text-align:center;padding:45px;color:var(--muted)}.empty strong{display:block;font:500 21px Georgia,"Songti SC",serif;color:var(--ink);margin-bottom:6px}.risk-note{font-size:10px;color:var(--muted);margin-top:12px}footer{margin-top:38px;border-top:1px solid var(--line);padding:22px 0;color:var(--muted);font-size:10px;display:flex;justify-content:space-between;gap:25px}footer strong{color:var(--ink)}
+    @media(max-width:1050px){.sidebar{position:static;width:auto;height:auto;display:block;padding:16px 20px}.side-card,.side-status{display:none}.brand{padding:0 0 12px}.nav{display:flex;overflow:auto}.nav-label{display:none}.nav button{white-space:nowrap}.workspace{margin:0;padding:25px 20px}.hero,.flow-wrap,.research{grid-template-columns:1fr}.coverage{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:700px){.topbar{display:block}.search{margin-top:18px;min-width:0}.brief-head,.section-title,.banner{align-items:flex-start;flex-direction:column}.stats{grid-template-columns:1fr}.hero .dark{padding:22px}.distribution{gap:5px;height:130px}.flow-head{display:none}.flow-row{grid-template-columns:1fr 1fr}.flow-row span:nth-child(5){grid-column:1/-1}.stock-head{display:none}.stock-row{grid-template-columns:1.3fr .7fr .55fr}.stock-row>span:nth-child(4),.stock-row>span:nth-child(5),.stock-row>span:nth-child(6),.stock-row>span:nth-child(7){display:none}.metrics{grid-template-columns:repeat(2,1fr)}.coverage{grid-template-columns:repeat(2,1fr)}footer{display:block}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">知</div><div><strong>知势</strong><span>A 股研究台</span></div></div>
+      <p class="nav-label">工作台</p>
+      <nav class="nav">
+        <button class="active" data-target="today"><i>01</i>市场复盘</button>
+        <button data-target="flow"><i>02</i>资金方向</button>
+        <button data-target="selection"><i>03</i>系统选股</button>
+        <button data-target="research"><i>04</i>个股研究</button>
+        <button data-target="status"><i>05</i>数据状态</button>
+      </nav>
+      <div class="side-card"><span class="eyebrow">研究框架</span><strong>全市场 × 多因子</strong><p>数据先校验，资金给线索<br>趋势、行业与风险做确认</p></div>
+      <div class="side-status"><span id="side-dot" class="dot"></span><span id="side-status">正在读取正式行情</span></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div><span id="snapshot-label" class="eyebrow">等待正式快照</span><h1>先看钱往哪里走，再判断逻辑能否成立。</h1></div>
+        <label class="search"><span>⌕</span><input id="search" placeholder="搜索股票 / 代码 / 板块" aria-label="搜索股票"></label>
+      </header>
+
+      <div id="banner" class="banner"><strong>正在读取公开仓库中的正式行情…</strong><p>不会使用演示数值覆盖读取失败。</p></div>
+
+      <section id="today" class="grid hero">
+        <article id="market-card" class="dark"><div class="empty"><strong>正在载入市场复盘</strong>数据来自公开仓库 data/market.json</div></article>
+        <article class="paper checklist">
+          <span class="eyebrow">今日行动清单</span><h3>从数据完整性到逻辑确认</h3>
+          <div class="checks">
+            <div class="check done"><b>✓</b><div><strong>先确认快照类型</strong><small>午盘只看半日状态，收盘用于完整复盘</small></div></div>
+            <div class="check"><b></b><div><strong>检查中性因子</strong><small>接口未覆盖项按中性处理，不凭空补数</small></div></div>
+            <div class="check"><b></b><div><strong>核对公告与原始逻辑</strong><small>系统分不能覆盖重大负面事实</small></div></div>
+          </div>
+          <div class="lesson"><span class="eyebrow">今日资金课</span><strong>流入是线索，不是买入理由。</strong><p>资金持续、价格确认和业务事实一致时，信号质量才会上升。</p></div>
+        </article>
+      </section>
+
+      <section id="flow" class="block">
+        <div class="section-title"><div><span class="eyebrow">资金方向</span><h2>今天的成交资金偏向哪里</h2></div><span id="flow-chip" class="chip">等待数据</span></div>
+        <div class="grid flow-wrap"><article id="flow-table" class="paper"><div class="empty"><strong>等待板块聚合</strong>正式行情载入后自动生成</div></article><aside class="dark method"><span class="eyebrow light">口径说明</span><h3>成交资金方向代理</h3><p>免费版本使用“成交额 × 涨跌方向强度”衡量资金偏向，可复现但不等同逐笔主力净流入。</p><dl><div><dt>数据源</dt><dd>AKShare · 新浪行情</dd></div><div><dt>更新频率</dt><dd>午盘 / 收盘</dd></div><div><dt>使用原则</dt><dd>只作线索，不作结论</dd></div></dl><small>如需真实主力净流入、估值及完整历史趋势，需要接入更高等级数据源。</small></aside></div>
+      </section>
+
+      <section id="selection" class="block">
+        <div class="section-title"><div><span class="eyebrow">系统选股</span><h2>多维评分候选池</h2></div><div id="modes" class="toolbar"><button class="active" data-mode="total">综合评分</button><button data-mode="funds">资金优先</button><button data-mode="risk">风险质量</button></div></div>
+        <article id="stock-table" class="paper stock-table"><div class="empty"><strong>等待评分数据</strong>只展示正式快照生成的候选股票</div></article>
+        <p class="risk-note">评分用于缩小研究范围，不替代公告核验、财务分析和仓位管理；缺失因子不会被虚构。</p>
+      </section>
+
+      <section id="research" class="block">
+        <div class="section-title"><div><span class="eyebrow">个股研究</span><h2>条件式分析</h2></div><span class="chip">点击候选股票查看</span></div>
+        <div id="research-grid" class="grid research"><article class="paper"><div class="empty"><strong>请选择一只股票</strong>评分池载入后可查看分项指标</div></article></div>
+      </section>
+
+      <section id="status" class="block">
+        <div class="section-title"><div><span class="eyebrow">数据状态</span><h2>每项指标都标明覆盖情况</h2></div><span id="data-chip" class="chip">等待正式快照</span></div>
+        <div id="coverage" class="grid coverage"></div>
+        <p class="risk-note">交易日 11:42 生成午盘快照、15:37 生成收盘快照；收盘失败时在 15:47、15:57 重试。节假日和抓取失败不会覆盖上一份有效数据。</p>
+      </section>
+
+      <footer><div><strong>知势 · A 股研究台</strong><br>资金给线索，系统做筛选，事实来验证。</div><p>仅用于学习与研究，不构成投资建议。交易前请以交易所公告和持牌行情终端复核。</p></footer>
+    </main>
+  </div>
+
+  <script>
+    const state={snapshot:null,selected:null,query:'',mode:'total'};
+    const $=s=>document.querySelector(s); const $$=s=>[...document.querySelectorAll(s)];
+    const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const sign=(n,d=1)=>`${n>0?'+':''}${Number(n||0).toFixed(d)}`;
+    const date=v=>v&&v.length===8?`${v.slice(0,4)}.${v.slice(4,6)}.${v.slice(6,8)}`:'等待数据';
+    const time=v=>{try{return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(v))}catch{return '—'}};
+    const metric=(n,s='')=>n==null?'—':`${Number(n).toFixed(2)}${s}`;
+    const moneyYi=n=>`${sign(n)}亿`;
+    const moneyWan=n=>n==null?'未覆盖':Math.abs(n)>=10000?`${sign(n/10000,2)}亿`:`${sign(n,0)}万`;
+    const factor=(stock,key)=>stock.factors?.find(x=>x.key===key)||{score:50,available:false,label:key};
+
+    async function loadData(){
+      const sources=['./data/market.json','https://raw.githubusercontent.com/gdsgsdhdsv/zhishi-a-share-data/main/data/market.json'];
+      for(const url of sources){try{const r=await fetch(`${url}?t=${Date.now()}`,{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();if(!d.market||!Array.isArray(d.stocks))throw 0;return d}catch{}}
+      throw new Error('data unavailable');
+    }
+    function renderMarket(){
+      const s=state.snapshot,m=s.market,max=Math.max(1,...m.distribution.map(x=>x.count));
+      $('#market-card').innerHTML=`<div class="brief-head"><div><span class="eyebrow light">今日一句话</span><h2>${esc(m.summary)}</h2></div><span class="pill">${esc(m.regime)}</span></div><div class="distribution">${m.distribution.map((x,i)=>`<div class="bar"><span>${x.count}</span><i class="${i<3?'down':'up'}" style="height:${Math.max(7,x.count/max*100)}%"></i><small>${esc(x.label)}</small></div>`).join('')}</div><div class="stats"><div class="stat"><span>上涨 / 下跌 / 平盘</span><strong class="up">${m.rising.toLocaleString()}</strong><strong class="down">${m.falling.toLocaleString()}</strong><small>/ ${m.flat}</small></div><div class="stat"><span>全市场成交</span><strong>${m.amountYi>=10000?(m.amountYi/10000).toFixed(2)+'万亿':m.amountYi.toFixed(0)+'亿'}</strong><small>正式行情汇总</small></div><div class="stat"><span>系统环境分</span><strong>${m.environmentScore}</strong><small>只作环境过滤</small></div></div>`;
+    }
+    function renderFlow(){
+      const rows=state.snapshot.sectors||[]; $('#flow-chip').textContent=`${date(state.snapshot.tradeDate)} · ${rows.length} 个板块`;
+      $('#flow-table').innerHTML=rows.length?`<div class="flow-head"><span>板块</span><span>今日方向</span><span>板块涨跌</span><span>股票数</span><span>信号 / 领涨</span></div>${rows.map((x,i)=>`<div class="flow-row"><span><i class="rank">${i+1}</i><strong>${esc(x.name)}</strong></span><span class="${x.netTodayYi>=0?'up':'down'}">${moneyYi(x.netTodayYi)}</span><span class="${x.pctChange>=0?'up':'down'}">${sign(x.pctChange)}%</span><span>${x.companyCount||'—'} 家</span><span><em class="signal ${x.netTodayYi>0?'hot':''}">${esc(x.signal)}</em><small>${esc(x.leadStock||'—')}</small></span><i class="flow-bar" style="width:${Math.min(100,Math.abs(x.netTodayYi)/Math.max(1,...rows.map(r=>Math.abs(r.netTodayYi)))*100)}%"></i></div>`).join('')}`:`<div class="empty"><strong>板块数据未覆盖</strong>本页不会使用演示板块代替</div>`;
+    }
+    function sortedStocks(){
+      const q=state.query.toLowerCase(); let arr=(state.snapshot.stocks||[]).filter(x=>`${x.name}${x.code}${x.industry}`.toLowerCase().includes(q));
+      return arr.sort((a,b)=>state.mode==='funds'?factor(b,'funds').score-factor(a,'funds').score:state.mode==='risk'?factor(b,'risk').score-factor(a,'risk').score:b.totalScore-a.totalScore);
+    }
+    function renderStocks(){
+      const rows=sortedStocks();
+      $('#stock-table').innerHTML=rows.length?`<div class="stock-head"><span>排名 / 股票</span><span>系统分</span><span>涨跌</span><span>资金</span><span>板块</span><span>风险</span><span>结论</span></div>${rows.slice(0,30).map((x,i)=>`<button class="stock-row ${state.selected?.code===x.code?'selected':''}" data-code="${esc(x.code)}"><span class="stock-name"><i>${String(i+1).padStart(2,'0')}</i><span><strong>${esc(x.name)}</strong><small>${esc(x.code)} · ${esc(x.industry)}</small></span></span><span class="score"><strong>${x.totalScore}</strong><i class="meter"><b style="width:${x.totalScore}%"></b></i></span><span class="${x.pctChange>=0?'up':'down'}">${sign(x.pctChange,2)}%</span><span>${factor(x,'funds').score}</span><span>${factor(x,'industry').score}</span><span>${factor(x,'risk').score}</span><span><em class="verdict">${esc(x.verdict)}</em></span></button>`).join('')}`:`<div class="empty"><strong>没有匹配结果</strong>换一个股票名、代码或板块试试</div>`;
+      $$('.stock-row').forEach(b=>b.onclick=()=>{state.selected=state.snapshot.stocks.find(x=>x.code===b.dataset.code);renderStocks();renderResearch();$('#research').scrollIntoView({behavior:'smooth'})});
+    }
+    function renderResearch(){
+      const x=state.selected;if(!x)return;const noteKey=`zhishi-note-${x.code}`;const saved=localStorage.getItem(noteKey)||`关注理由：${x.industry}，系统分 ${x.totalScore}，当前为“${x.trendState}”。\n验证条件：趋势、资金与板块强度继续确认。\n失效条件：趋势破坏、资金转弱或出现确认负面公告。`;
+      $('#research-grid').innerHTML=`<article class="paper"><div class="quote-line"><h2>${esc(x.name)} <small>${esc(x.code)}</small></h2><strong class="quote">${Number(x.close).toFixed(2)}</strong><span class="${x.pctChange>=0?'up':'down'}">${sign(x.pctChange,2)}%</span></div><div class="metrics"><div class="metric"><span>成交额</span><strong>${Number(x.amountYi).toFixed(2)}亿</strong></div><div class="metric"><span>换手率</span><strong>${metric(x.turnoverRate,'%')}</strong></div><div class="metric"><span>资金方向</span><strong>${moneyWan(x.netFlowWan)}</strong></div><div class="metric"><span>系统结论</span><strong>${esc(x.verdict)}</strong></div></div><div class="note"><span class="eyebrow">我的原始逻辑</span><textarea id="note">${esc(saved)}</textarea><button id="save-note">保存研究笔记</button></div></article><aside class="dark"><span class="eyebrow light">分项质量评分</span><h3>综合分 ${x.totalScore} · ${esc(x.trendState)}</h3><div class="factor-list">${(x.factors||[]).map(f=>`<div class="factor"><span>${esc(f.label)}${f.available?'':' · 中性'}</span><i class="factor-track"><i style="width:${f.score}%"></i></i><strong>${f.score}</strong></div>`).join('')}</div><p class="risk-note" style="color:#aab5af">风险闸门：${x.riskGate?'已触发降级':'当前通过'}。评分仅用于研究排序。</p></aside>`;
+      $('#save-note').onclick=()=>{localStorage.setItem(noteKey,$('#note').value);$('#save-note').textContent='已保存 ✓';setTimeout(()=>$('#save-note').textContent='保存研究笔记',1500)};
+    }
+    function renderCoverage(){
+      const c=state.snapshot.coverage||{};const items=[['正式行情',c.quotes,'AKShare 公开行情'],['估值数据',c.valuation,'未覆盖时保持中性'],['个股资金',c.stockFlow,'免费方向代理'],['板块资金',c.sectorFlow,'板块成交方向'],['行业归属',c.industry,'板块代码规则']];
+      $('#coverage').innerHTML=items.map(([n,ok,d])=>`<article><span class="${ok?'':'missing'}">${ok?'已载入':'部分/未载入'}</span><strong>${n}</strong><small>${d}</small></article>`).join('');
+    }
+    function renderAll(){
+      const s=state.snapshot,label=`${date(s.tradeDate)} · ${s.snapshotType==='midday'?'午盘':'收盘'}快照 · ${time(s.updatedAt)}`;$('#snapshot-label').textContent=label;$('#side-status').textContent='正式行情已载入';$('#side-dot').className='dot ok';$('#data-chip').textContent=s.source;$('#banner').className='banner ok';$('#banner').innerHTML=`<strong>正式行情已载入 · ${esc(s.source)}</strong><p>${esc(s.warnings?.[0]||'数据为公开行情快照。')}</p>`;renderMarket();renderFlow();state.selected=s.stocks?.[0]||null;renderStocks();renderResearch();renderCoverage();
+    }
+    $$('.nav button').forEach(b=>b.onclick=()=>{$$('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.target).scrollIntoView({behavior:'smooth'})});
+    $('#search').oninput=e=>{state.query=e.target.value;renderStocks()};
+    $$('#modes button').forEach(b=>b.onclick=()=>{$$('#modes button').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.mode=b.dataset.mode;renderStocks()});
+    loadData().then(d=>{state.snapshot=d;renderAll()}).catch(()=>{$('#side-status').textContent='正式行情读取失败';$('#side-dot').className='dot error';$('#banner').innerHTML='<strong>暂时无法读取正式行情</strong><p>请稍后刷新；页面不会使用演示数据替代。</p>';$('#market-card').innerHTML='<div class="empty"><strong>数据暂不可用</strong>上一份有效快照仍保留在公开仓库中</div>'});
+  </script>
+</body>
+</html>
