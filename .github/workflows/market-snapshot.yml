@@ -1,0 +1,77 @@
+name: A-share market snapshot
+
+on:
+  schedule:
+    - cron: "42 11 * * 1-5"
+      timezone: "Asia/Shanghai"
+    - cron: "37 15 * * 1-5"
+      timezone: "Asia/Shanghai"
+  workflow_dispatch:
+    inputs:
+      snapshot_type:
+        description: Snapshot type
+        required: true
+        default: close
+        type: choice
+        options:
+          - close
+          - midday
+
+permissions:
+  contents: write
+
+concurrency:
+  group: market-snapshot
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-snapshot.txt
+      - run: pip install -r requirements-snapshot.txt
+      - name: Choose snapshot type
+        id: snapshot
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ inputs.snapshot_type }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "42 11 * * 1-5" ]; then
+            echo "type=midday" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=close" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build validated snapshot
+        shell: bash
+        run: |
+          snapshot_type="${{ steps.snapshot.outputs.type }}"
+          attempts=1
+          if [ "$snapshot_type" = "close" ]; then attempts=3; fi
+          for attempt in $(seq 1 "$attempts"); do
+            if python scripts/build_market_snapshot.py --snapshot-type "$snapshot_type" --output data/market.json; then
+              exit 0
+            fi
+            if [ "$attempt" -lt "$attempts" ]; then
+              echo "收盘数据尚不完整，10 分钟后进行第 $((attempt + 1)) 次检查"
+              sleep 600
+            fi
+          done
+          exit 1
+      - name: Commit only a new valid snapshot
+        shell: bash
+        run: |
+          if git diff --quiet -- data/market.json; then
+            echo "没有新快照需要提交"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/market.json
+          git commit -m "data: refresh ${{ steps.snapshot.outputs.type }} market snapshot"
+          git push
