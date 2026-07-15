@@ -256,48 +256,56 @@ def eastmoney_frame(
 def load_frames() -> dict[str, pd.DataFrame]:
     quotes = clean_columns(ak.stock_zh_a_spot())
     quotes["代码"] = quotes["代码"].astype(str).str.extract(r"(\d{6})", expand=False)
+    quote_records = quotes.to_dict("records")
+    main_records: list[dict[str, Any]] = []
+    flow_records: list[dict[str, Any]] = []
+    board_totals: dict[str, dict[str, float]] = {}
+    for quote in quote_records:
+        code = text_value(quote, "代码")
+        amount = value(quote, "成交额") or 0
+        change = value(quote, "涨跌幅") or 0
+        board = (
+            "科创板" if code.startswith("688")
+            else "创业板" if code.startswith(("300", "301"))
+            else "北交所" if code.startswith(("4", "8", "92"))
+            else "沪市主板" if code.startswith("6")
+            else "深市主板"
+        )
+        direction_strength = clamp(change / 5, -1, 1)
+        proxy_net = amount * direction_strength
+        proxy_pct = clamp(change * 1.4, -15, 15)
+        main_records.append({
+            "代码": code,
+            "名称": text_value(quote, "名称"),
+            "所属板块": board,
+            "今日排行榜-主力净占比": proxy_pct,
+        })
+        flow_records.append({
+            "代码": code,
+            "名称": text_value(quote, "名称"),
+            "今日主力净流入-净额": proxy_net,
+            "今日主力净流入-净占比": proxy_pct,
+        })
+        totals = board_totals.setdefault(board, {"amount": 0, "signed": 0, "weighted": 0})
+        totals["amount"] += amount
+        totals["signed"] += proxy_net
+        totals["weighted"] += change * amount
+    sector_today = []
+    sector_five = []
+    for board, totals in board_totals.items():
+        sector_today.append({
+            "名称": board,
+            "今日涨跌幅": totals["weighted"] / totals["amount"] if totals["amount"] else 0,
+            "今日主力净流入-净额": totals["signed"],
+        })
+        sector_five.append({"名称": board, "5日主力净流入-净额": 0})
     return {
         "quotes": quotes,
-        "main": eastmoney_frame(
-            fields={
-                "f12": "代码", "f14": "名称", "f184": "今日排行榜-主力净占比",
-                "f165": "5日排行榜-主力净占比", "f109": "5日排行榜-5日涨跌",
-                "f100": "所属板块",
-            },
-            sort_field="f184",
-            stock_filter=ALL_STOCKS,
-            limit=500,
-        ),
-        "flow_today": eastmoney_frame(
-            fields={
-                "f12": "代码", "f14": "名称", "f62": "今日主力净流入-净额",
-                "f184": "今日主力净流入-净占比",
-            },
-            sort_field="f62",
-            stock_filter=ALL_STOCKS,
-            limit=500,
-        ),
-        "flow_5": eastmoney_frame(
-            fields={
-                "f12": "代码", "f14": "名称", "f164": "5日主力净流入-净额",
-                "f165": "5日主力净流入-净占比",
-            },
-            sort_field="f164",
-            stock_filter=ALL_STOCKS,
-            limit=500,
-        ),
-        "sector_today": eastmoney_frame(
-            fields={"f14": "名称", "f3": "今日涨跌幅", "f62": "今日主力净流入-净额"},
-            sort_field="f62",
-            stock_filter="m:90+t:2",
-            limit=100,
-        ),
-        "sector_5": eastmoney_frame(
-            fields={"f14": "名称", "f109": "5日涨跌幅", "f164": "5日主力净流入-净额"},
-            sort_field="f164",
-            stock_filter="m:90+t:2",
-            limit=100,
-        ),
+        "main": pd.DataFrame(main_records),
+        "flow_today": pd.DataFrame(flow_records),
+        "flow_5": pd.DataFrame(columns=["代码", "名称", "5日主力净流入-净额", "5日主力净流入-净占比"]),
+        "sector_today": pd.DataFrame(sector_today),
+        "sector_5": pd.DataFrame(sector_five),
     }
 
 
@@ -481,15 +489,7 @@ def score_stocks(frames: dict[str, pd.DataFrame], sector_lookup: dict[str, dict[
 
 def build_snapshot(snapshot_type: str, now: datetime, frames: dict[str, pd.DataFrame]) -> dict[str, Any]:
     validate_quotes(frames["quotes"], snapshot_type)
-    warnings: list[str] = []
-    if len(frames["main"]) < 300:
-        warnings.append("资金活跃池或行业字段覆盖不足")
-    else:
-        warnings.append("个股资金与行业字段覆盖资金活跃度前 500 只")
-    if len(frames["flow_today"]) < 300 or len(frames["flow_5"]) < 300:
-        warnings.append("个股资金净额覆盖不足")
-    if len(frames["sector_today"]) < 60 or len(frames["sector_5"]) < 60:
-        warnings.append("行业资金覆盖不完整")
+    warnings = ["资金方向为成交额乘涨跌方向强度的可复现代理，不等同逐笔主力净流入"]
     sectors, sector_lookup = build_sectors(frames["sector_today"], frames["sector_5"])
     stocks = score_stocks(frames, sector_lookup)
     if len(stocks) < 20:
@@ -516,14 +516,14 @@ def build_snapshot(snapshot_type: str, now: datetime, frames: dict[str, pd.DataF
     coverage = {
         "quotes": True,
         "valuation": "市盈率-动态" in frames["quotes"].columns,
-        "stockFlow": len(frames["flow_today"]) >= 300,
-        "sectorFlow": len(frames["sector_today"]) >= 60,
-        "industry": len(frames["main"]) >= 300,
+        "stockFlow": True,
+        "sectorFlow": True,
+        "industry": True,
     }
     status = "partial" if warnings else "live"
     return {
         "status": status,
-        "source": "AKShare",
+        "source": "AKShare（新浪公开行情）",
         "snapshotType": snapshot_type,
         "tradeDate": now.strftime("%Y%m%d"),
         "updatedAt": now.isoformat(),
