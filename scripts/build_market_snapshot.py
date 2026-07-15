@@ -122,7 +122,7 @@ FACTORS = (
     ("trend", "趋势结构", 18),
     ("volume", "量价配合", 12),
     ("funds", "资金行为", 16),
-    ("industry", "行业强度", 12),
+    ("industry", "市场板块强度", 12),
     ("valuation", "估值位置", 12),
     ("momentum", "相对动量", 10),
     ("liquidity", "流动性", 10),
@@ -381,7 +381,7 @@ def score_stocks(frames: dict[str, pd.DataFrame], sector_lookup: dict[str, dict[
         name = text_value(quote, "名称")
         close = value(quote, "最新价")
         amount = value(quote, "成交额")
-        if not re.fullmatch(r"\d{6}", code) or not name or not close or close <= 0 or not amount or amount < 50_000_000 or "退" in name:
+        if not re.fullmatch(r"\d{6}", code) or not name or not close or close <= 0 or amount is None or amount < 0 or "退" in name:
             continue
         main_row = main.get(code)
         today_row = flow_today.get(code)
@@ -484,15 +484,43 @@ def score_stocks(frames: dict[str, pd.DataFrame], sector_lookup: dict[str, dict[
             "riskGate": risk_gate,
             "factors": factors,
         })
-    return sorted(stocks, key=lambda item: item["totalScore"], reverse=True)[:40]
+    return sorted(stocks, key=lambda item: item["totalScore"], reverse=True)
+
+
+def compact_stock(stock: dict[str, Any]) -> dict[str, Any]:
+    """Keep the full market searchable without duplicating verbose factor metadata."""
+    compact = {
+        "code": stock["code"],
+        "name": stock["name"],
+        "industry": stock["industry"],
+        "close": stock["close"],
+        "pctChange": stock["pctChange"],
+        "amountYi": stock["amountYi"],
+        "netFlowWan": stock["netFlowWan"],
+        "totalScore": stock["totalScore"],
+        "verdict": stock["verdict"],
+        "trendState": stock["trendState"],
+        "riskGate": stock["riskGate"],
+        "scores": [item["score"] for item in stock["factors"]],
+        "available": sum((1 << index) for index, item in enumerate(stock["factors"]) if item["available"]),
+    }
+    for key in ("turnoverRate", "volumeRatio", "peTtm", "pb", "marketCapYi", "return5", "return60"):
+        if stock.get(key) is not None:
+            compact[key] = stock[key]
+    return compact
 
 
 def build_snapshot(snapshot_type: str, now: datetime, frames: dict[str, pd.DataFrame]) -> dict[str, Any]:
     validate_quotes(frames["quotes"], snapshot_type)
-    warnings = ["资金方向为成交额乘涨跌方向强度的可复现代理，不等同逐笔主力净流入"]
+    warnings = [
+        "资金方向为成交额乘涨跌方向强度的可复现代理，不等同逐笔主力净流入",
+        "免费快照当前覆盖市场板块归属，尚未覆盖申万行业与概念题材归属",
+    ]
     sectors, sector_lookup = build_sectors(frames["sector_today"], frames["sector_5"])
-    stocks = score_stocks(frames, sector_lookup)
-    if len(stocks) < 20:
+    scored_universe = score_stocks(frames, sector_lookup)
+    stocks = [stock for stock in scored_universe if (stock.get("amountYi") or 0) >= 0.5][:120]
+    universe = [compact_stock(stock) for stock in scored_universe]
+    if len(stocks) < 20 or len(universe) < 4500:
         raise RuntimeError("评分池有效股票不足")
 
     changes = pd.to_numeric(frames["quotes"]["涨跌幅"], errors="coerce").dropna()
@@ -518,7 +546,8 @@ def build_snapshot(snapshot_type: str, now: datetime, frames: dict[str, pd.DataF
         "valuation": "市盈率-动态" in frames["quotes"].columns,
         "stockFlow": True,
         "sectorFlow": True,
-        "industry": True,
+        "marketSegment": True,
+        "industry": False,
     }
     status = "partial" if warnings else "live"
     return {
@@ -529,6 +558,7 @@ def build_snapshot(snapshot_type: str, now: datetime, frames: dict[str, pd.DataF
         "updatedAt": now.isoformat(),
         "message": "正式免费数据快照已载入。" if status == "live" else "正式行情已载入，部分免费指标暂缺。",
         "warnings": warnings,
+        "factorOrder": [item[0] for item in FACTORS],
         "coverage": coverage,
         "market": {
             "rising": rising,
@@ -541,8 +571,10 @@ def build_snapshot(snapshot_type: str, now: datetime, frames: dict[str, pd.DataF
             "summary": summary,
             "distribution": [{"label": label, "count": count} for label, count in zip(labels, buckets)],
         },
+        "sectorKind": "market_segment",
         "sectors": sectors,
         "stocks": stocks,
+        "universe": universe,
     }
 
 
